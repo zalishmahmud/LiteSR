@@ -1,0 +1,105 @@
+"""
+Find the mathematical function skeleton that represents the rate of change of bicarbonate
+concentration (d[HCO3-]/dt) during CO2 dissolution in a saline aquifer system, given data
+on carbonic acid [H2CO3], bicarbonate [HCO3-], carbonate [CO3^2-], temperature T, and
+proton concentration Y.
+
+When CO2 is injected into saline aquifers, it dissolves and reacts through a cascade of
+pH-sensitive equilibria to form carbonate minerals. Bicarbonate sits at a central intermediate
+in this cascade — produced by carbonic acid dissociation and consumed by further deprotonation
+to carbonate. Both production and consumption involve the local proton concentration, which
+itself evolves dynamically through charge conservation as the system relaxes toward equilibrium.
+
+The rate of change of bicarbonate is governed by four competing reactions:
+  1. Carbonic acid dissociates to produce bicarbonate (source).
+  2. Bicarbonate recombines with protons to reform carbonic acid (sink).
+  3. Bicarbonate dissociates further to produce carbonate (sink).
+  4. Carbonate recombines with protons to reform bicarbonate (source).
+
+Key physical intuitions to consider:
+  - All reaction rates are sensitive to temperature via a shared kinetic law —
+    look for a named formula in chemical kinetics relating rate to temperature.
+  - Reactions 2 and 4 depend on the availability of protons (Y) in the system.
+  - Each reaction has its own characteristic rate constant.
+  - The system is in mol/L concentrations and T is in Kelvin.
+"""
+
+import numpy as np
+
+MAX_NPARAMS = 10
+params = [1.0] * MAX_NPARAMS
+
+
+@evaluate.run
+def evaluate(data: dict) -> float:
+    """Evaluate the equation candidate on observed data."""
+
+    inputs, outputs = data['inputs'], data['outputs']
+
+    # Unpack input columns: [H2CO3, HCO3, CO3, T, Y]
+    H2CO3 = inputs[:, 0]
+    HCO3  = inputs[:, 1]
+    CO3   = inputs[:, 2]
+    T     = inputs[:, 3]
+    Y     = inputs[:, 4]
+
+    from scipy.optimize import minimize
+
+    def arrhenius(k0, Ea, R, T, T0):
+        return k0 * np.exp(-Ea / R * (1.0 / T - 1.0 / T0))
+
+    def target_equation(H2CO3, HCO3, CO3, T, Y):
+        p = {'Ea3': 0.8132702392002724, 'Ea4': 0.6066357757671799, 'Ea_3': 0.9127555772777217, 'Ea_4': 0.7294965609839984, 'R': 8.314, 'T0': 0.5436249914654229, 'k3': 0.6369616873214543, 'k4': 0.04097352393619469, 'k_3': 0.2697867137638703, 'k_4': 0.016527635528529094}
+        k3  = arrhenius(p["k3"],  p["Ea3"],  p["R"], T, p["T0"])
+        k_3 = arrhenius(p["k_3"], p["Ea_3"], p["R"], T, p["T0"])
+        k4  = arrhenius(p["k4"],  p["Ea4"],  p["R"], T, p["T0"])
+        k_4 = arrhenius(p["k_4"], p["Ea_4"], p["R"], T, p["T0"])
+
+        source1 = k3  * H2CO3
+        sink1   = k_3 * Y * HCO3
+        sink2   = k4  * HCO3
+        source2 = k_4 * Y * CO3
+
+        return source1 - sink1 - sink2 + source2
+
+    def loss(params):
+        y_pred = equation(H2CO3, HCO3, CO3, T, Y, params)
+        outputs = target_equation(H2CO3, HCO3, CO3, T, Y)
+        return np.mean((y_pred - outputs) ** 2)
+
+    rng = np.random.default_rng()
+    x0 = rng.uniform(low=0, high=1.0, size=MAX_NPARAMS)
+    result = minimize(loss, x0, method='BFGS')
+
+    loss_val = result.fun
+    if np.isnan(loss_val) or np.isinf(loss_val):
+        return None
+    else:
+        return -loss_val, result.x.tolist()
+
+
+@equation.evolve
+def equation(
+    H2CO3: np.ndarray,
+    HCO3:  np.ndarray,
+    CO3:   np.ndarray,
+    T:     np.ndarray,
+    Y:     np.ndarray,
+    params: np.ndarray,
+) -> np.ndarray:
+    """Mathematical function for d[HCO3-]/dt in a CO2 carbonate dissolution system.
+
+    Args:
+        H2CO3 : Carbonic acid concentration                    [mol L-1]
+        HCO3  : Bicarbonate concentration                      [mol L-1]
+        CO3   : Carbonate concentration                        [mol L-1]
+        T     : Temperature                                    [K]
+        Y     : Proton concentration from charge conservation  [mol L-1]
+        params: Array of numeric constants / parameters to be optimised.
+
+    Returns:
+        A numpy array representing d[HCO3-]/dt                 [mol L-1 s-1]
+    """
+    # Naive linear placeholder — LLM will evolve this into the true structure
+    y = params[0] * H2CO3 + params[1] * HCO3 + params[2] * CO3 + params[3] * Y + params[4] * T
+    return y

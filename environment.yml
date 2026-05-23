@@ -1,0 +1,60 @@
+name: litesr
+channels:
+  - apple
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - pip
+  - ca-certificates
+  - openssl
+  - pip:
+      # ── Core scientific stack ──────────────────────────────────────────────
+      - "numpy<2"          # pinned: torch 2.1.0 is incompatible with numpy 2.x
+      - pandas
+      - scipy
+      - scikit-learn
+      - matplotlib
+      - seaborn
+      - pillow
+      - tqdm
+      - pyyaml
+      - python-dotenv
+
+      # ── PyTorch ───────────────────────────────────────────────────────────
+      - torch==2.1.0
+      - torchvision
+      - torchaudio
+      - tensorboard
+
+      # ── HuggingFace ecosystem ─────────────────────────────────────────────
+      - transformers==4.38.1
+      - accelerate==0.27.2
+      - bitsandbytes
+      - huggingface-hub==0.20.3
+      - tokenizers==0.15.2
+      - safetensors==0.4.2
+      - sentencepiece==0.2.0
+
+      # ── LLM API clients ───────────────────────────────────────────────────
+      - anthropic
+      - openai
+
+      # ── RAG / vector DB ───────────────────────────────────────────────────
+      - pymilvus
+      - pdfplumber
+      - pypdf
+
+      # ── Web / serving ─────────────────────────────────────────────────────
+      - flask==3.0.2
+      - flask-cors==4.0.0
+      - fastapi==0.110.0
+      - uvicorn==0.27.1
+      - pydantic==2.6.2
+      - requests
+      - websockets
+
+      # ── Distributed / misc ────────────────────────────────────────────────
+      - ray==2.9.3
+      - absl-py
+      - nvitop

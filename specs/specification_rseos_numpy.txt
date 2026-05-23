@@ -1,0 +1,87 @@
+"""
+Find the mathematical function skeleton that represents the pressure-volume
+relationship in a compressed solid, given data on volume V.
+
+When a solid material is compressed under extreme pressure — such as minerals
+in the Earth's deep interior or metals in diamond anvil cell experiments —
+its volume decreases and pressure rises nonlinearly. The relationship between
+pressure and volume is governed by the material's elastic properties, which
+themselves change with compression.
+
+Key physical intuitions to consider:
+  - At the reference (zero-pressure) volume, pressure is zero.
+  - As volume decreases below the reference, pressure rises steeply.
+  - The bulk modulus (resistance to compression) scales as a power law
+    with the compression ratio V/V0.
+  - The leading pressure term is proportional to a strain variable built
+    from the cube root of V/V0, which vanishes at the reference volume.
+  - Nonlinear stiffening is captured by an exponential in that strain variable.
+  - The elastic properties of the material evolve continuously throughout
+    the compression range.
+  - V is the only input variable.
+"""
+
+import numpy as np
+
+MAX_NPARAMS = 4
+params = [1.0] * MAX_NPARAMS
+
+
+@evaluate.run
+def evaluate(data: dict) -> float:
+    """Evaluate the equation candidate on observed data."""
+
+    inputs, outputs = data['inputs'], data['outputs']
+
+    # Unpack input columns: [V]
+    V = inputs[:, 0]
+
+    from scipy.optimize import minimize
+
+    def target_equation(V):
+        p = {
+            'K0'      : 0.8869780242779817,
+            'V0'      : 0.7194392198760262,
+            'K0_prime': 0.9292989599556912,
+            'K_inf'   : 0.8487,
+        }
+        x       = V / p['V0']
+        x13     = x ** (1.0 / 3.0)
+        eta     = 1.0 - x13
+        exp_arg = (1.5 * p['K0_prime'] - 3.0 * p['K_inf'] + 0.5) * eta
+        return 3.0 * p['K0'] * (x ** (-p['K_inf'])) * eta * np.exp(exp_arg)
+
+    outputs = target_equation(V)
+
+    def loss(params):
+        y_pred = equation(V, params)
+        return np.mean((y_pred - outputs) ** 2)
+
+    rng = np.random.default_rng()
+    x0 = rng.uniform(low=0.5, high=1.0, size=MAX_NPARAMS)
+    result = minimize(loss, x0, method='BFGS')
+
+    loss_val = result.fun
+    if np.isnan(loss_val) or np.isinf(loss_val):
+        return None
+    else:
+        return -loss_val, result.x.tolist()
+
+
+@equation.evolve
+def equation(
+    V:      np.ndarray,
+    params: np.ndarray,
+) -> np.ndarray:
+    """Mathematical function for pressure P in the R-S Equation of State.
+
+    Args:
+        V     : Volume                    [same units as V0]
+        params: Array of numeric constants / parameters to be optimised.
+
+    Returns:
+        A numpy array representing pressure P.
+    """
+    # Naive placeholder — LLM will evolve this into the true structure
+    y = params[0] * V + params[1]
+    return y

@@ -1,0 +1,39 @@
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.env
+.env.*
+!.env.example
+.DS_Store
+.idea/
+
+# experiment outputs
+logs/
+
+# user-supplied RAG papers (drop PDFs here at runtime)
+papers/*.pdf
+
+# Node / frontend
+node_modules/
+dashboard/node_modules/
+dashboard/dist/
+dist/
+*.local
+.npm
+.pnpm-store/
+
+# IDE / tool artifacts
+html
+html/
+junk/
+
+# scratch files
+test.py
+
+# Claude Code internal config
+CLAUDE.md
+
+# scratch / work-in-progress files
+generated_specs/
+video_to_gif/

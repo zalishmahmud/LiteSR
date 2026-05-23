@@ -1,0 +1,83 @@
+"""
+Find the mathematical function skeleton that represents the rate of change of nitrate
+concentration (d[NO3-]/dt) in an aquatic biogeochemical system, given data on ammonium (NH4+),
+nitrite (NO2-), nitrate (NO3-), dissolved oxygen (O2), organic carbon (CH2O), temperature (T),
+and pH.
+
+The system involves three competing microbial processes:
+  1. Nitrification   (SOURCE): NH4+ oxidised to NO3- under aerobic conditions.
+  2. Denitrification (SINK):   NO3- reduced to N2 gas under anoxic conditions, consuming organic carbon.
+  3. DNRA            (SINK):   NO3- reduced to NH4+ under anoxic conditions, consuming organic carbon.
+
+Key physical relationships to consider:
+  - Substrate limitation follows Michaelis-Menten kinetics:  S / (K_s + S)
+  - Oxygen inhibition (anoxic switch) follows:               K_inh / (K_inh + O2)
+  - Temperature dependence follows Arrhenius-type:           exp(theta * (T - T_ref))
+  - All rate constants and half-saturation constants are positive.
+  - The output is signed: positive = net NO3- production, negative = net NO3- consumption.
+"""
+
+import numpy as np
+
+MAX_NPARAMS = 14
+params = [1.0] * MAX_NPARAMS
+
+
+@evaluate.run
+def evaluate(data: dict) -> float:
+    """Evaluate the equation candidate on observed data."""
+
+    inputs, outputs = data['inputs'], data['outputs']
+
+    NH4  = inputs[:, 0]
+    NO2  = inputs[:, 1]
+    NO3  = inputs[:, 2]
+    O2   = inputs[:, 3]
+    CH2O = inputs[:, 4]
+    T    = inputs[:, 5]
+    pH   = inputs[:, 6]
+
+    from scipy.optimize import minimize
+
+    def loss(params):
+        y_pred = equation(NH4, NO2, NO3, O2, CH2O, T, pH, params)
+        return np.mean((y_pred - outputs) ** 2)
+
+    result = minimize(loss, [1.0] * MAX_NPARAMS, method='BFGS')
+
+    loss_val = result.fun
+    if np.isnan(loss_val) or np.isinf(loss_val):
+        return None
+    else:
+        return -loss_val
+
+
+@equation.evolve
+def equation(
+    NH4:  np.ndarray,
+    NO2:  np.ndarray,
+    NO3:  np.ndarray,
+    O2:   np.ndarray,
+    CH2O: np.ndarray,
+    T:    np.ndarray,
+    pH:   np.ndarray,
+    params: np.ndarray,
+) -> np.ndarray:
+    """Mathematical function for d[NO3-]/dt in a nitrogen-cycle biogeochemical model.
+
+    Args:
+        NH4   : Ammonium concentration          [mg N  L-1]
+        NO2   : Nitrite  concentration          [mg N  L-1]
+        NO3   : Nitrate  concentration          [mg N  L-1]
+        O2    : Dissolved oxygen                [mg O2 L-1]
+        CH2O  : Labile organic carbon (DOC)     [mg C  L-1]
+        T     : Temperature                     [deg C]
+        pH    : pH                              [-]
+        params: Array of numeric constants / parameters to be optimised.
+
+    Returns:
+        A numpy array representing d[NO3-]/dt   [mg N L-1 d-1]
+    """
+    # Naive linear placeholder — LLM will evolve this into the true structure
+    y = params[0] * NH4 + params[1] * NO3 + params[2] * O2 + params[3] * CH2O + params[4] * T
+    return y
